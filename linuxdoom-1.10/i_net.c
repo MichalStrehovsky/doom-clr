@@ -28,18 +28,6 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include <stdio.h>
 
 #ifdef _WIN32
-#pragma comment( lib, "Ws2_32.lib" )
-#define boolean win_boolean
-#include <winsock2.h>
-#undef boolean
-#undef MAXCHAR
-#undef MAXSHORT
-#undef MAXINT
-#undef MAXLONG
-#undef MINCHAR
-#undef MINSHORT
-#undef MININT
-#undef MINLONG
 #include <errno.h>
 #include "unistd.h"
 #define IPPORT_USERRESERVED 5000

@@ -566,14 +566,14 @@ void D_AddFile (char *file)
 void IdentifyVersion (void)
 {
 
-    char*	doom1wad;
-    char*	doomwad;
-    char*	doomuwad;
-    char*	doom2wad;
+    char*	doom1wad = "doom1.wad";
+    char*	doomwad = "doom.wad";
+    char*	doomuwad = "doomu.wad";
+    char*	doom2wad = "doom2.wad";
 
-    char*	doom2fwad;
-    char*	plutoniawad;
-    char*	tntwad;
+    char*	doom2fwad = "";
+    char*	plutoniawad = "";
+    char*	tntwad = "";
 
 #ifdef NORMALUNIX
     char *home;

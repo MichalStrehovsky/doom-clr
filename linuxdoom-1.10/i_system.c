@@ -30,17 +30,6 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 
 #include <stdarg.h>
 #ifdef _WIN32
-#define boolean win_boolean
-#include <winsock2.h>
-#undef boolean
-#undef MAXCHAR
-#undef MAXSHORT
-#undef MAXINT
-#undef MAXLONG
-#undef MINCHAR
-#undef MINSHORT
-#undef MININT
-#undef MINLONG
 #include <time.h>
 #include "unistd.h" 
 #else
