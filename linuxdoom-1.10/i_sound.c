@@ -30,20 +30,31 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 
 #include <math.h>
 
+#ifdef _WIN32
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 
 #ifndef LINUX
+#ifndef _WIN32
 #include <sys/filio.h>
+#endif
 #endif
 
 #include <fcntl.h>
+#ifdef _WIN32 
+#include "unistd.h"
+#else
 #include <unistd.h>
 #include <sys/ioctl.h>
+#endif
 
 // Linux voxware output.
+#ifndef _WIN32 
 #include <linux/soundcard.h>
-
+#endif
 // Timer stuff. Experimental.
 #include <time.h>
 #include <signal.h>
@@ -152,7 +163,7 @@ int*		channelrightvol_lookup[NUM_CHANNELS];
 
 
 
-
+#ifndef _WIN32
 //
 // Safe ioctl, convenience.
 //
@@ -174,7 +185,7 @@ myioctl
     }
 }
 
-
+#endif
 
 
 
@@ -737,6 +748,9 @@ void I_ShutdownSound(void)
 void
 I_InitSound()
 { 
+#ifdef _WIN32
+
+#else
 #ifdef SNDSERV
   char buffer[256];
   
@@ -822,6 +836,7 @@ I_InitSound()
   fprintf(stderr, "I_InitSound: sound module ready\n");
     
 #endif
+#endif
 }
 
 
@@ -905,6 +920,9 @@ int I_QrySongPlaying(int handle)
 #endif
 
 
+#ifdef _WIN32
+
+#else
 // We might use SIGVTALRM and ITIMER_VIRTUAL, if the process
 //  time independend timer happens to get lost due to heavy load.
 // SIGALRM and ITIMER_REAL doesn't really work well.
@@ -912,6 +930,7 @@ int I_QrySongPlaying(int handle)
 static int /*__itimer_which*/  itimer = ITIMER_REAL;
 
 static int sig = SIGALRM;
+#endif
 
 // Interrupt handler.
 void I_HandleSoundTimer( int ignore )
@@ -940,6 +959,9 @@ void I_HandleSoundTimer( int ignore )
 // Get the interrupt. Set duration in millisecs.
 int I_SoundSetTimer( int duration_of_tick )
 {
+#ifdef _WIN32
+    return 0;
+#else
   // Needed for gametick clockwork.
   struct itimerval    value;
   struct itimerval    ovalue;
@@ -973,6 +995,7 @@ int I_SoundSetTimer( int duration_of_tick )
     fprintf( stderr, "I_SoundSetTimer: interrupt n.a.\n");
   
   return res;
+#endif
 }
 
 

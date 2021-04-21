@@ -27,6 +27,23 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include <string.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+#pragma comment( lib, "Ws2_32.lib" )
+#define boolean win_boolean
+#include <winsock2.h>
+#undef boolean
+#undef MAXCHAR
+#undef MAXSHORT
+#undef MAXINT
+#undef MAXLONG
+#undef MINCHAR
+#undef MINSHORT
+#undef MININT
+#undef MINLONG
+#include <errno.h>
+#include "unistd.h"
+#define IPPORT_USERRESERVED 5000
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -34,6 +51,7 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
+#endif
 
 #include "i_system.h"
 #include "d_event.h"
@@ -243,6 +261,9 @@ int GetLocalAddress (void)
 //
 void I_InitNetwork (void)
 {
+#ifdef _WIN32
+
+#else
     boolean		trueval = true;
     int			i;
     int			p;
@@ -329,6 +350,7 @@ void I_InitNetwork (void)
     ioctl (insocket, FIONBIO, &trueval);
 
     sendsocket = UDPsocket ();
+#endif
 }
 
 

@@ -24,6 +24,54 @@
 static const char
 rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
+#ifdef _WIN32
+
+#include "doomdef.h"
+#include "doomtype.h"
+
+void I_InitGraphics (void)
+{
+}
+
+
+void I_ShutdownGraphics(void)
+{
+}
+
+// Takes full 8 bit values.
+void I_SetPalette (byte* palette)
+{
+}
+
+
+void I_UpdateNoBlit (void)
+{
+}
+
+void I_FinishUpdate (void)
+{
+}
+
+void I_ReadScreen (byte* scr)
+{
+}
+
+//
+// I_StartFrame
+//
+void I_StartFrame (void)
+{
+    // er?
+
+}
+
+// I_StartTic
+//
+void I_StartTic (void)
+{
+}
+
+#else
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/ipc.h>
@@ -1048,3 +1096,4 @@ Expand4
 }
 
 
+#endif
