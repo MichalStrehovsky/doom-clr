@@ -1,3 +1,150 @@
+#if _WIN32
+#include "doomtype.h"
+#include "doomdef.h"
+#include "doomstat.h"
+#include "d_ticcmd.h"
+
+
+void I_Init (void)
+{
+    I_InitSound();
+    //  I_InitGraphics();
+}
+
+
+int	mb_used = 6;
+
+
+// Called by startup code
+// to get the ammount of memory to malloc
+// for the zone management.
+byte*	I_ZoneBase (int *size)
+{
+    *size = mb_used*1024*1024;
+    return (byte *) malloc (*size);
+}
+
+
+// Called by D_DoomLoop,
+// returns current time in tics.
+int I_GetTime (void)
+{
+    LARGE_INTEGER large;
+    LARGE_INTEGER freq;
+    QueryPerformanceCounter( &large );
+    QueryPerformanceFrequency( &freq );
+
+    return large.QuadPart * TICRATE / freq.QuadPart;
+
+ //   struct timeval	tp;
+ //   int			newtics;
+ //   static int		basetime=0;
+ // 
+ //   gettimeofday(&tp, NULL);
+ //   if (!basetime)
+	//basetime = tp.tv_sec;
+ //   newtics = (tp.tv_sec-basetime)*TICRATE + tp.tv_usec*TICRATE/1000000;
+ //   return newtics;
+}
+
+
+
+//
+// Called by D_DoomLoop,
+// called before processing any tics in a frame
+// (just after displaying a frame).
+// Time consuming syncronous operations
+// are performed here (joystick reading).
+// Can call D_PostEvent.
+//
+void I_StartFrame (void)
+{
+}
+
+
+//
+// Called by D_DoomLoop,
+// called before processing each tic in a frame.
+// Quick syncronous operations are performed here.
+// Can call D_PostEvent.
+//void I_StartTic (void)
+//{
+//}
+
+// Asynchronous interrupt functions should maintain private queues
+// that are read by the synchronous functions
+// to be converted into events.
+
+// Either returns a null ticcmd,
+// or calls a loadable driver to build it.
+// This ticcmd will then be modified by the gameloop
+// for normal input.
+
+ticcmd_t	emptycmd;
+
+ticcmd_t* I_BaseTiccmd (void)
+{
+    return &emptycmd;
+}
+
+
+// Called by M_Responder when quit is selected.
+// Clean exit, displays sell blurb.
+void I_Quit (void)
+{
+    D_QuitNetGame ();
+    I_ShutdownSound();
+    I_ShutdownMusic();
+    M_SaveDefaults ();
+    I_ShutdownGraphics();
+    exit(0);
+}
+
+
+
+// Allocates from low memory under dos,
+// just mallocs under unix
+byte* I_AllocLow (int length)
+{
+    byte*	mem;
+        
+    mem = (byte *)malloc (length);
+    memset (mem,0,length);
+    return mem;
+}
+
+void I_Tactile (int on, int off, int total)
+{
+  // UNUSED.
+  on = off = total = 0;
+}
+
+
+void I_Error (char *error, ...)
+{
+    va_list	argptr;
+
+    // Message first.
+    va_start (argptr,error);
+    fprintf (stderr, "Error: ");
+    vfprintf (stderr,error,argptr);
+    fprintf (stderr, "\n");
+    va_end (argptr);
+
+    fflush( stderr );
+
+    // Shutdown. Here might be other errors.
+    if (demorecording)
+	G_CheckDemoStatus();
+
+    D_QuitNetGame ();
+    I_ShutdownGraphics();
+    
+    exit(-1);
+}
+
+
+#else
 // Emacs style mode select   -*- C++ -*- 
 //-----------------------------------------------------------------------------
 //
@@ -29,13 +176,9 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include <string.h>
 
 #include <stdarg.h>
-#ifdef _WIN32
-#include <time.h>
-#include "unistd.h" 
-#else
 #include <sys/time.h>
 #include <unistd.h>
-#endif
+
 
 #include "doomdef.h"
 #include "m_misc.h"
@@ -92,9 +235,6 @@ byte* I_ZoneBase (int*	size)
 //
 int  I_GetTime (void)
 {
-#ifdef _WIN32
-    return 0;
-#else    
     struct timeval	tp;
     struct timezone	tzp;
     int			newtics;
@@ -105,7 +245,6 @@ int  I_GetTime (void)
 	basetime = tp.tv_sec;
     newtics = (tp.tv_sec-basetime)*TICRATE + tp.tv_usec*TICRATE/1000000;
     return newtics;
-#endif    
 }
 
 
@@ -134,9 +273,6 @@ void I_Quit (void)
 
 void I_WaitVBL(int count)
 {
-#ifdef _WIN32 
-
-#else
 #ifdef SGI
     sginap(1);                                           
 #else
@@ -144,7 +280,6 @@ void I_WaitVBL(int count)
     sleep(0);
 #else
     usleep (count * (1000000/70) );                                
-#endif
 #endif
 #endif
 }
@@ -194,3 +329,5 @@ void I_Error (char *error, ...)
     
     exit(-1);
 }
+
+#endif

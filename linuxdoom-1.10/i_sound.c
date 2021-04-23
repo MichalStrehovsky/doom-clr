@@ -1,3 +1,88 @@
+#ifdef _WIN32
+char*	sndserver_filename = "./sndserver ";
+
+
+// Init at program start...
+void I_InitSound(){}
+
+// ... update sound buffer and audio device at runtime...
+void I_UpdateSound(void){}
+void I_SubmitSound(void){}
+
+// ... shut down and relase at program termination.
+void I_ShutdownSound(void){}
+
+
+//
+//  SFX I/O
+//
+
+// Initialize channels?
+void I_SetChannels(){}
+
+// Get raw data lump index for sound descriptor.
+int I_GetSfxLumpNum (struct sfxinfo_t* sfxinfo ){ return 0; }
+
+
+// Starts a sound in a particular sound channel.
+int
+I_StartSound
+( int		id,
+  int		vol,
+  int		sep,
+  int		pitch,
+  int		priority ){ return 0;  }
+
+
+// Stops a sound channel.
+void I_StopSound(int handle){}
+
+// Called by S_*() functions
+//  to see if a channel is still playing.
+// Returns 0 if no longer playing, 1 if playing.
+int I_SoundIsPlaying(int handle){ return 0; }
+
+// Updates the volume, separation,
+//  and pitch of a sound channel.
+void
+I_UpdateSoundParams
+( int		handle,
+  int		vol,
+  int		sep,
+  int		pitch ){}
+
+
+//
+//  MUSIC I/O
+//
+void I_InitMusic(void){}
+void I_ShutdownMusic(void){}
+// Volume.
+void I_SetMusicVolume(int volume){}
+// PAUSE game handling.
+void I_PauseSong(int handle){}
+void I_ResumeSong(int handle){}
+// Registers a song handle to song data.
+static int idx = 0;
+int I_RegisterSong(void *data){ return 0; }
+// Called by anything that wishes to start music.
+//  plays a song, and when the song is done,
+//  starts playing it again in an endless loop.
+// Horrible thing to do, considering.
+void
+I_PlaySong
+( int		handle,
+  int		looping ){}
+// Stops a song over 3 seconds.
+void I_StopSong(int handle){}
+// See above (register), then think backwards
+void I_UnRegisterSong(int handle){}
+
+
+
+
+
+#else
 // Emacs style mode select   -*- C++ -*- 
 //-----------------------------------------------------------------------------
 //
@@ -30,31 +115,20 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 
 #include <math.h>
 
-#ifdef _WIN32
-#include <time.h>
-#else
 #include <sys/time.h>
-#endif
 #include <sys/types.h>
 
 #ifndef LINUX
-#ifndef _WIN32
 #include <sys/filio.h>
-#endif
 #endif
 
 #include <fcntl.h>
-#ifdef _WIN32 
-#include "unistd.h"
-#else
 #include <unistd.h>
 #include <sys/ioctl.h>
-#endif
 
 // Linux voxware output.
-#ifndef _WIN32 
 #include <linux/soundcard.h>
-#endif
+
 // Timer stuff. Experimental.
 #include <time.h>
 #include <signal.h>
@@ -163,7 +237,7 @@ int*		channelrightvol_lookup[NUM_CHANNELS];
 
 
 
-#ifndef _WIN32
+
 //
 // Safe ioctl, convenience.
 //
@@ -185,7 +259,7 @@ myioctl
     }
 }
 
-#endif
+
 
 
 
@@ -748,9 +822,6 @@ void I_ShutdownSound(void)
 void
 I_InitSound()
 { 
-#ifdef _WIN32
-
-#else
 #ifdef SNDSERV
   char buffer[256];
   
@@ -836,7 +907,6 @@ I_InitSound()
   fprintf(stderr, "I_InitSound: sound module ready\n");
     
 #endif
-#endif
 }
 
 
@@ -920,9 +990,6 @@ int I_QrySongPlaying(int handle)
 #endif
 
 
-#ifdef _WIN32
-
-#else
 // We might use SIGVTALRM and ITIMER_VIRTUAL, if the process
 //  time independend timer happens to get lost due to heavy load.
 // SIGALRM and ITIMER_REAL doesn't really work well.
@@ -930,7 +997,6 @@ int I_QrySongPlaying(int handle)
 static int /*__itimer_which*/  itimer = ITIMER_REAL;
 
 static int sig = SIGALRM;
-#endif
 
 // Interrupt handler.
 void I_HandleSoundTimer( int ignore )
@@ -959,9 +1025,6 @@ void I_HandleSoundTimer( int ignore )
 // Get the interrupt. Set duration in millisecs.
 int I_SoundSetTimer( int duration_of_tick )
 {
-#ifdef _WIN32
-    return 0;
-#else
   // Needed for gametick clockwork.
   struct itimerval    value;
   struct itimerval    ovalue;
@@ -995,7 +1058,6 @@ int I_SoundSetTimer( int duration_of_tick )
     fprintf( stderr, "I_SoundSetTimer: interrupt n.a.\n");
   
   return res;
-#endif
 }
 
 
@@ -1006,3 +1068,5 @@ void I_SoundDelTimer()
   if ( I_SoundSetTimer( 0 ) == -1)
     fprintf( stderr, "I_SoundDelTimer: failed to remove interrupt. Doh!\n");
 }
+
+#endif

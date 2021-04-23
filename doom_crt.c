@@ -1,9 +1,13 @@
+static_assert( sizeof( void* ) == 4, "Must be built as a 32 bit application. Use the x86 visual studio command prompt." );
+
 #pragma warning( disable: 4113 )
 #pragma warning( disable: 4311 )
 #pragma warning( disable: 4047 )
 #pragma warning( disable: 4024 )
 #pragma warning( disable: 4312 )
 #pragma warning( disable: 4020 )
+#pragma warning( disable: 4028 )
+#pragma warning( disable: 4005 )
 #pragma warning( disable: 4700 )
 #pragma warning( disable: 4133 )
 #pragma warning( disable: 4142 )
@@ -33,8 +37,6 @@
 #include "linuxdoom-1.10/info.c"
 #include "linuxdoom-1.10/i_main.c"
 #include "linuxdoom-1.10/i_sound.c"
-#include "linuxdoom-1.10/i_system.c"
-#include "linuxdoom-1.10/i_video.c"
 #include "linuxdoom-1.10/m_argv.c"
 #include "linuxdoom-1.10/m_bbox.c"
 #include "linuxdoom-1.10/m_cheat.c"
@@ -88,7 +90,6 @@
 
 #undef open
 #undef close
-
 #include <io.h>
 #include "linuxdoom-1.10/m_menu.c"
 #include "linuxdoom-1.10/m_misc.c"
@@ -96,14 +97,28 @@
 #include "linuxdoom-1.10/w_wad.c"
 #undef strupr
 
-#undef MAXCHAR
-#undef MAXSHORT
-#undef MAXINT
-#undef MAXLONG
-#undef MINCHAR
-#undef MINSHORT
-#undef MININT
-#undef MINLONG
+#define APP_WINDOWS
+
+#define boolean HACK_TO_MAKE_BOOLEAN_NOT_BE_DEFINED
+#define APP_IMPLEMENTATION
+#include "libs_win32/app.h"
+#undef APP_IMPLEMENTATION
+
+#define FRAMETIMER_IMPLEMENTATION
+#include "libs_win32/frametimer.h"
+
+#define CRTEMU_PC_IMPLEMENTATION
+#include "libs_win32/crtemu_pc.h"
+#include "libs_win32/crt_frame_pc.h"
+
+#define THREAD_IMPLEMENTATION
+#include "libs_win32/thread.h"
+#undef THREAD_IMPLEMENTATION
+#undef boolean 
+
+#include "linuxdoom-1.10/i_video.c"
+#include "linuxdoom-1.10/i_system.c"
+
 #pragma comment( lib, "Ws2_32.lib" )
 #define boolean win32_boolean
 #include <winsock2.h>

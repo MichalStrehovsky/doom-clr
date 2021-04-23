@@ -1,3 +1,233 @@
+#ifdef _WIN32
+#include "doomtype.h"
+
+#include <inttypes.h>
+
+#include "doomstat.h"
+#include "i_system.h"
+#include "v_video.h"
+#include "m_argv.h"
+#include "d_main.h"
+
+#include "doomdef.h"
+
+uint8_t app_palette[256 * 3];
+uint8_t* app_screen;
+thread_atomic_int_t app_running;
+
+event_t event_queue[ 256 ] = {0};
+int events_count = 0;
+thread_mutex_t event_mutex;
+
+thread_signal_t vblank_signal;
+
+int get_doom_key_enum( int k )
+{
+    switch( k )
+    {
+        case APP_KEY_UP: return KEY_UPARROW;
+        case APP_KEY_DOWN: return KEY_DOWNARROW;
+        case APP_KEY_LEFT: return KEY_LEFTARROW;
+        case APP_KEY_RIGHT: return KEY_RIGHTARROW;
+        case APP_KEY_ESCAPE: return KEY_ESCAPE;
+        case APP_KEY_SHIFT: return KEY_RSHIFT;
+        case APP_KEY_CONTROL: return KEY_RCTRL;
+        case APP_KEY_RETURN: return KEY_ENTER;
+		case APP_KEY_SPACE: return ' ';
+    }
+
+	if( k > APP_KEY_A && k <= APP_KEY_Z ) {
+		return 'a' + (k - APP_KEY_A);
+	}
+
+	if( k > APP_KEY_0 && k <= APP_KEY_9 ) {
+		return '0' + (k - APP_KEY_0);
+	}
+
+    return -1;
+}
+
+int counter = 0;
+void app_proc( app_t* app, void* user_data )
+{
+  	app_screenmode( app, APP_SCREENMODE_FULLSCREEN );
+	//app_screenmode( app, APP_SCREENMODE_WINDOW );
+	//app_window_size( app, 800, 600 ); 
+	app_interpolation( app, APP_INTERPOLATION_NONE );
+
+    uint8_t* screen_buffer_xbgr = (uint8_t*)malloc( SCREENWIDTH * SCREENHEIGHT * 4 );
+
+    frametimer_t* frametimer = frametimer_create( 0);
+    frametimer_lock_rate( frametimer, 70 );
+    
+    crtemu_pc_t* crtemu_pc = crtemu_pc_create( 0 );
+	crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) a_crt_frame, 1024, 1024 );
+
+    APP_U32 empty = 0;
+    app_pointer( app, 1, 1, empty, 0, 0 );
+
+    while( thread_atomic_int_load(&app_running) && app_yield( app ) != APP_STATE_EXIT_REQUESTED )
+    {
+        if( app_screen )
+        {
+            for( int i = 0; i < SCREENWIDTH * SCREENHEIGHT; ++i )
+            {
+                uint8_t scr = app_screen[ i ];
+                screen_buffer_xbgr[ i * 4 + 3] = 0xff;
+                screen_buffer_xbgr[ i * 4 ] = app_palette[ scr * 3 ];
+                screen_buffer_xbgr[ i * 4 + 1] = app_palette[ scr * 3 + 1 ];
+                screen_buffer_xbgr[ i * 4 + 2] = app_palette[ scr * 3 + 2 ];
+            }
+        }
+
+        frametimer_update( frametimer );
+        ++counter;
+		thread_signal_raise( &vblank_signal );
+
+        crtemu_pc_present( crtemu_pc, time, screen_buffer_xbgr, SCREENWIDTH, SCREENHEIGHT, 0xffffff, 0x000000 );
+        app_present( app, 0, 0, 0, 0xffffffff, 0x00000000);
+
+    }
+    free( screen_buffer_xbgr );
+}
+
+void app_proc_thread()
+{
+    app_run( app_proc, NULL, NULL, NULL, NULL );
+}
+
+void I_InitGraphics (void)
+{
+    thread_mutex_init( &event_mutex );
+	thread_signal_init( &vblank_signal );
+
+    app_screen = (uint8_t*)malloc( SCREENWIDTH * SCREENHEIGHT );
+    thread_atomic_int_store( &app_running, 1 );
+
+    thread_create( app_proc_thread, 0, "", THREAD_STACK_SIZE_DEFAULT );
+}
+
+void I_ShutdownGraphics(void)
+{
+    thread_atomic_int_store( &app_running, 0 );
+    
+    free( app_screen );
+    app_screen = 0;
+
+    thread_signal_term( &vblank_signal );
+}
+
+// Takes full 8 bit values.
+void I_SetPalette (byte* palette)
+{
+    memcpy( app_palette, palette, 256 * 3 );
+}
+
+void I_UpdateNoBlit (void)
+{
+}
+
+void I_FinishUpdate (void)
+{
+    if( app_screen )
+    {
+        memcpy( app_screen, screens[ 0 ], SCREENWIDTH*SCREENHEIGHT );
+    }
+}
+
+//
+// Called by D_DoomLoop,
+// called before processing each tic in a frame.
+// Quick syncronous operations are performed here.
+// Can call D_PostEvent.
+void I_StartTic (void)
+{
+    static int prev[ 256 ] = { 0 };
+    int keys[ 256 ];
+    for( int i = 0; i < 256; ++i ) keys[ i ] = ( GetAsyncKeyState( i ) & 0x8000 ) != 0;
+
+    for( int i = 0; i < 255; ++i ) 
+    {
+        int key = 0;
+        
+        switch( i )
+        {
+            case VK_UP: key = KEY_UPARROW; break;
+            case VK_DOWN: key = KEY_DOWNARROW; break;
+            case VK_LEFT: key = KEY_LEFTARROW; break;
+            case VK_RIGHT: key = KEY_RIGHTARROW; break;
+            case VK_ESCAPE: key = KEY_ESCAPE; break;
+            case VK_SHIFT: key = KEY_RSHIFT; break;
+            case VK_CONTROL: key = KEY_RCTRL; break;
+            case VK_RMENU: key = KEY_RALT; break;
+            case VK_LMENU: key = KEY_LALT; break;
+            case VK_RETURN: key = KEY_ENTER; break;
+			case VK_PAUSE: key = KEY_PAUSE; break;
+		    case VK_SPACE: key = ' '; break;
+            default:
+                key = tolower( i );
+        }
+
+        if( keys[ i ] && !prev[ i ] )
+            {
+            event_t ev;
+            ev.type = ev_keydown;
+            ev.data1 = key;
+            D_PostEvent( &ev );
+            }
+        else if( !keys[ i ] && prev[ i ] )
+            {       
+            event_t ev;
+            ev.type = ev_keyup;
+            ev.data1 = key;
+            D_PostEvent( &ev );
+            }
+        prev[ i ] = keys[ i ];
+	}
+
+    RECT r;
+    GetClientRect( GetDesktopWindow(), &r );
+    r.bottom -= r.top;
+    r.right -= r.left;
+    POINT pos;
+    GetCursorPos( &pos );
+    pos.x -= r.right / 2;
+    pos.y -= r.bottom / 2;
+
+    event_t ev;
+	ev.type = ev_mouse;
+    ev.data1 = 0;
+	ev.data2 = pos.x << 2;
+	ev.data3 = -pos.y << 2;
+    D_PostEvent( &ev );
+    SetCursorPos(r.right / 2,r.bottom / 2);
+}
+
+// Wait for vertical retrace or pause a bit.
+void I_WaitVBL(int count)
+{
+    int c = counter;
+    while ( counter - c < count )
+	    thread_signal_wait( &vblank_signal, 1000 );
+}
+
+void I_ReadScreen (byte* scr)
+{
+    memcpy( scr, screens[0], SCREENWIDTH * SCREENHEIGHT );
+}
+
+void I_BeginRead (void)
+{
+
+}
+
+void I_EndRead (void)
+{
+
+}
+
+
+#else
 // Emacs style mode select   -*- C++ -*- 
 //-----------------------------------------------------------------------------
 //
@@ -24,54 +254,6 @@
 static const char
 rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
-#ifdef _WIN32
-
-#include "doomdef.h"
-#include "doomtype.h"
-
-void I_InitGraphics (void)
-{
-}
-
-
-void I_ShutdownGraphics(void)
-{
-}
-
-// Takes full 8 bit values.
-void I_SetPalette (byte* palette)
-{
-}
-
-
-void I_UpdateNoBlit (void)
-{
-}
-
-void I_FinishUpdate (void)
-{
-}
-
-void I_ReadScreen (byte* scr)
-{
-}
-
-//
-// I_StartFrame
-//
-void I_StartFrame (void)
-{
-    // er?
-
-}
-
-// I_StartTic
-//
-void I_StartTic (void)
-{
-}
-
-#else
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/ipc.h>
@@ -104,6 +286,7 @@ int XShmGetEventBase( Display* dpy ); // problems with g++?
 #include "d_main.h"
 
 #include "doomdef.h"
+
 
 #define POINTER_WARP_COUNTDOWN	1
 
@@ -1094,6 +1277,7 @@ Expand4
 	xline += step;
     } while (y--);
 }
+
 
 
 #endif
