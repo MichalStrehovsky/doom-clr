@@ -36,7 +36,6 @@ static_assert( sizeof( void* ) == 4, "Must be built as a 32 bit application. Use
 #include "linuxdoom-1.10/hu_stuff.c"
 #include "linuxdoom-1.10/info.c"
 #include "linuxdoom-1.10/i_main.c"
-#include "linuxdoom-1.10/i_sound.c"
 #include "linuxdoom-1.10/m_argv.c"
 #include "linuxdoom-1.10/m_bbox.c"
 #include "linuxdoom-1.10/m_cheat.c"
@@ -116,6 +115,15 @@ static_assert( sizeof( void* ) == 4, "Must be built as a 32 bit application. Use
 #undef THREAD_IMPLEMENTATION
 #undef boolean 
 
+#define MUS_IMPLEMENTATION
+#include "libs_win32/mus.h"
+
+#define TSF_IMPLEMENTATION
+#include "libs_win32/tsf.h"
+
+#include "libs_win32/soundfont.c"
+
+#include "linuxdoom-1.10/i_sound.c"
 #include "linuxdoom-1.10/i_video.c"
 #include "linuxdoom-1.10/i_system.c"
 

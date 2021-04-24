@@ -21,7 +21,8 @@ void I_ShutdownSound(void){}
 void I_SetChannels(){}
 
 // Get raw data lump index for sound descriptor.
-int I_GetSfxLumpNum (struct sfxinfo_t* sfxinfo ){ return 0; }
+int I_GetSfxLumpNum (struct sfxinfo_t* sfxinfo ){ 
+    return 0; }
 
 
 // Starts a sound in a particular sound channel.
@@ -55,6 +56,12 @@ I_UpdateSoundParams
 //
 //  MUSIC I/O
 //
+struct music_t {
+    mus_t* mus;
+    int reset;
+    int left_over;
+} music = { NULL, 1, 0 };
+
 void I_InitMusic(void){}
 void I_ShutdownMusic(void){}
 // Volume.
@@ -64,7 +71,7 @@ void I_PauseSong(int handle){}
 void I_ResumeSong(int handle){}
 // Registers a song handle to song data.
 static int idx = 0;
-int I_RegisterSong(void *data){ return 0; }
+int I_RegisterSong(void *data){ return (int)(uintptr_t)data; }
 // Called by anything that wishes to start music.
 //  plays a song, and when the song is done,
 //  starts playing it again in an endless loop.
@@ -72,15 +79,151 @@ int I_RegisterSong(void *data){ return 0; }
 void
 I_PlaySong
 ( int		handle,
-  int		looping ){}
+  int		looping ){
+    
+    void* data = (void*)(uintptr_t)handle;
+    if( music.mus ) {
+        mus_destroy( music.mus );
+        music.mus = NULL;
+    }
+    int size = *( ( (uint16_t*) data ) + 2 ) + *( ( (uint16_t*) data ) + 3 ); 
+    music.mus = mus_create( data, size, NULL );
+    music.left_over = 0;
+    music.reset = 1;
+}
 // Stops a song over 3 seconds.
-void I_StopSong(int handle){}
+void I_StopSong(int handle){
+    // TODO: fadeout
+    mus_destroy( music.mus );
+    music.mus = NULL;
+    music.left_over = 0;
+    music.reset = 1;
+}
 // See above (register), then think backwards
 void I_UnRegisterSong(int handle){}
 
 
 
+void render_music( short* sample_pairs, int sample_pairs_count, tsf* sound_font ) {
+    mus_t* mus = music.mus;
+    if( !mus ) {
+        memset( sample_pairs, 0, sizeof( short ) * sample_pairs_count * 2 );
+    }
+    if( music.reset ) {
+        tsf_reset( sound_font );
+        music.reset = 0;
+    }
+    int left_over_from_previous = music.left_over;
+    int remaining = sample_pairs_count;
+    short* output = sample_pairs;
+    int left_over = 0;
+    if( left_over_from_previous ) {
+        int count = left_over_from_previous ;
+        if( count > remaining ) {
+            left_over = count - remaining;
+            count = remaining;
+        }
+        tsf_render_short( sound_font, output, count, 0 );
+        remaining -= count;
+        output += count * 2;
+    }
+    if( left_over ) {
+        music.left_over = left_over;
+        return;
+    }
 
+    while( remaining ) {
+        mus_event_t event;
+        mus_next_event( mus, &event );
+        switch( event.cmd ) {
+            case MUS_CMD_RELEASE_NOTE: {
+                tsf_channel_note_off( sound_font, event.channel, event.data.release_note.note );
+            } break;
+            case MUS_CMD_PLAY_NOTE: {
+                tsf_channel_note_on( sound_font, event.channel, event.data.play_note.note, event.data.play_note.volume / 127.0f );
+            } break;
+            case MUS_CMD_PITCH_BEND: {
+                int pitch_bend = ( event.data.pitch_bend.bend_amount - 128 ) * 64 + 8192;
+                tsf_channel_set_pitchwheel( sound_font, event.channel, pitch_bend );
+            } break;
+            case MUS_CMD_SYSTEM_EVENT: {
+                switch( event.data.system_event.event ) {
+                    case MUS_SYSTEM_EVENT_ALL_SOUNDS_OFF: {
+                        tsf_channel_sounds_off_all( sound_font, event.channel );
+                    } break;
+                    case MUS_SYSTEM_EVENT_ALL_NOTES_OFF: {
+                        tsf_channel_note_off_all( sound_font, event.channel );
+                    } break;
+                    case MUS_SYSTEM_EVENT_MONO: {
+                        // Not supported
+                    } break;
+                    case MUS_SYSTEM_EVENT_POLY: {
+                        // Not supported
+                    } break;
+                    case MUS_SYSTEM_EVENT_RESET_ALL_CONTROLLERS: {
+                        tsf_channel_midi_control( sound_font, event.channel, 121, 0 );
+                    } break;
+                }
+            } break;
+            case MUS_CMD_CONTROLLER: {
+                int value = event.data.controller.value;
+                switch( event.data.controller.controller ) {
+                    case MUS_CONTROLLER_CHANGE_INSTRUMENT: {
+                        if( event.channel == 15 ) {
+                            tsf_channel_set_presetnumber( sound_font, 15, 0, 1 );
+                        } else {
+                            tsf_channel_set_presetnumber( sound_font, event.channel, value, 0 );
+                        }
+                    } break;
+                    case MUS_CONTROLLER_BANK_SELECT: {
+                        tsf_channel_set_bank( sound_font, event.channel, value );
+                    } break;
+                    case MUS_CONTROLLER_MODULATION: {
+                        // Not supported
+                    } break;
+                    case MUS_CONTROLLER_VOLUME: {
+                        tsf_channel_midi_control( sound_font, event.channel, 7, value );
+                    } break;
+                    case MUS_CONTROLLER_PAN: {
+                        tsf_channel_midi_control( sound_font, event.channel, 10, value );
+                    } break;
+                    case MUS_CONTROLLER_EXPRESSION: {
+                        tsf_channel_midi_control( sound_font, event.channel, 11, value );
+                    } break;
+                    case MUS_CONTROLLER_REVERB_DEPTH: {
+                        // Not supported
+                    } break;
+                    case MUS_CONTROLLER_CHORUS_DEPTH: {
+                        // Not supported
+                    } break;
+                    case MUS_CONTROLLER_SUSTAIN_PEDAL: {
+                        // Not supported
+                    } break;
+                    case MUS_CONTROLLER_SOFT_PEDAL: {
+                        // Not supported
+                    } break;
+                }
+            } break;
+            case MUS_CMD_END_OF_MEASURE: {
+                // Not used
+            } break;
+            case MUS_CMD_FINISH: {
+                mus_restart( mus );
+            } break;
+            case MUS_CMD_RENDER_SAMPLES: {
+                int count = event.data.render_samples.samples_count;
+                if( count > remaining ) {
+                    left_over = count - remaining;
+                    count = remaining;
+                }
+                tsf_render_short( sound_font, output, count, 0 );
+                remaining -= count;
+                output += count * 2;
+            } break;
+        }
+    }
+    music.left_over = left_over;
+}
 
 #else
 // Emacs style mode select   -*- C++ -*- 

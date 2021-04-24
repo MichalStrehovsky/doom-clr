@@ -47,6 +47,16 @@ int get_doom_key_enum( int k )
     return -1;
 }
 
+typedef struct app_sound_data_t {
+    tsf* sound_font;
+} app_sound_data_t;
+
+void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_data ) {
+    app_sound_data_t* app_sound_data = (app_sound_data_t*) user_data;
+    render_music( sample_pairs, sample_pairs_count, app_sound_data->sound_font );
+}
+
+
 int counter = 0;
 void app_proc( app_t* app, void* user_data )
 {
@@ -58,7 +68,7 @@ void app_proc( app_t* app, void* user_data )
     uint8_t* screen_buffer_xbgr = (uint8_t*)malloc( SCREENWIDTH * SCREENHEIGHT * 4 );
 
     frametimer_t* frametimer = frametimer_create( 0);
-    frametimer_lock_rate( frametimer, 70 );
+    frametimer_lock_rate( frametimer, 60 );
     
     crtemu_pc_t* crtemu_pc = crtemu_pc_create( 0 );
 	crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) a_crt_frame, 1024, 1024 );
@@ -66,6 +76,9 @@ void app_proc( app_t* app, void* user_data )
     APP_U32 empty = 0;
     app_pointer( app, 1, 1, empty, 0, 0 );
 
+    app_sound_data_t app_sound_data;
+    app_sound_data.sound_font = tsf_load_memory( soundfont, sizeof( soundfont ) );
+    app_sound( app, 5880, sound_callback, &app_sound_data );
     while( thread_atomic_int_load(&app_running) && app_yield( app ) != APP_STATE_EXIT_REQUESTED )
     {
         if( app_screen )
@@ -88,6 +101,8 @@ void app_proc( app_t* app, void* user_data )
         app_present( app, 0, 0, 0, 0xffffffff, 0x00000000);
 
     }
+    app_sound( app, 0, NULL, NULL );
+    tsf_close( app_sound_data.sound_font );
     free( screen_buffer_xbgr );
 }
 
