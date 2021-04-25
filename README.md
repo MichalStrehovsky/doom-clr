@@ -42,7 +42,7 @@ the exe straight away. Enjoy!
 /Mattias Gustavsson
 
 ------------------------------------------------------------------------
-# ORIGINAL README FROM ORIGINAL SOURCE CODE RELEASE FOLLOWS
+## ORIGINAL README FROM ORIGINAL SOURCE CODE RELEASE FOLLOWS
 ------------------------------------------------------------------------
 
 Here it is, at long last.  The DOOM source code is released for your
