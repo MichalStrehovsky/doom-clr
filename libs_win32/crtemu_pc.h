@@ -661,7 +661,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
         "    col += vec3(ghs*(1.0-0.114))*pow(clamp(vec3(3.0)*b,vec3(0.0),vec3(1.0)),vec3(2.0))*vec3(i);\n"
 	    "\n"
 	    "    /* Level adjustment (curves) */\n"
-	    "    col *= vec3(0.95,1.05,0.95);\n"
+	    "    col *= vec3(1.0,1.1,1.0);\n"
         "    col = clamp(col*1.3 + 0.75*col*col + 1.25*col*col*col*col*col,vec3(0.0),vec3(10.0));\n"
 	    "\n"
 	    "    /* Vignette */\n"
@@ -773,7 +773,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
         "    vec4 a = texture2D( tex0, uv ) * vec4( modulate );"
         "    vec4 b = texture2D( tex1, uv );"
 		""
-        "    gl_FragColor = max( a, b * 0.32 );"
+        "    gl_FragColor = max( a, b * 0.24 );"
         "    }   "
 		"";
 
@@ -1053,15 +1053,15 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
     window_width = (int)( window_width / 1.2f );
 
     float hscale = window_width / (float) width;
-    float vscale = window_height / ( (float) height * 1.1f );
+    float vscale = window_height / ( (float) height * 1.35f );
     float pixel_scale = hscale < vscale ? hscale : vscale;
 
     float hborder = ( window_width - pixel_scale * width ) / 2.0f;
-    float vborder = ( window_height - pixel_scale * height * 1.1f ) / 2.0f;
+    float vborder = ( window_height - pixel_scale * height * 1.35f ) / 2.0f;
     float x1 = hborder;
     float y1 = vborder;
     float x2 = x1 + pixel_scale * width;
-    float y2 = y1 + pixel_scale * height * 1.1f;
+    float y2 = y1 + pixel_scale * height * 1.35f;
 
     x1 = ( x1 / window_width ) * 2.0f - 1.0f;
     x2 = ( x2 / window_width ) * 2.0f - 1.0f;

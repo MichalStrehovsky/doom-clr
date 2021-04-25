@@ -21,32 +21,6 @@ thread_mutex_t event_mutex;
 
 thread_signal_t vblank_signal;
 
-int get_doom_key_enum( int k )
-{
-    switch( k )
-    {
-        case APP_KEY_UP: return KEY_UPARROW;
-        case APP_KEY_DOWN: return KEY_DOWNARROW;
-        case APP_KEY_LEFT: return KEY_LEFTARROW;
-        case APP_KEY_RIGHT: return KEY_RIGHTARROW;
-        case APP_KEY_ESCAPE: return KEY_ESCAPE;
-        case APP_KEY_SHIFT: return KEY_RSHIFT;
-        case APP_KEY_CONTROL: return KEY_RCTRL;
-        case APP_KEY_RETURN: return KEY_ENTER;
-		case APP_KEY_SPACE: return ' ';
-    }
-
-	if( k > APP_KEY_A && k <= APP_KEY_Z ) {
-		return 'a' + (k - APP_KEY_A);
-	}
-
-	if( k > APP_KEY_0 && k <= APP_KEY_9 ) {
-		return '0' + (k - APP_KEY_0);
-	}
-
-    return -1;
-}
-
 typedef struct app_sound_data_t {
     tsf* sound_font;
 } app_sound_data_t;
@@ -145,7 +119,18 @@ void I_ShutdownGraphics(void)
 // Takes full 8 bit values.
 void I_SetPalette (byte* palette)
 {
-    memcpy( app_palette, palette, 256 * 3 );
+    int i;
+    int c;
+	// set the X colormap entries
+	for (i=0 ; i<256 ; i++)
+	{
+	c = gammatable[usegamma][*palette++];
+	app_palette[i*3+0] = (c<<8) + c;
+	c = gammatable[usegamma][*palette++];
+	app_palette[i*3+1] = (c<<8) + c;
+	c = gammatable[usegamma][*palette++];
+	app_palette[i*3+2] = (c<<8) + c;
+	}
 }
 
 void I_UpdateNoBlit (void)
@@ -177,6 +162,24 @@ void I_StartTic (void)
         
         switch( i )
         {
+            case VK_RSHIFT: key = KEY_RSHIFT; break;
+            case VK_RCONTROL: key = KEY_RCTRL; break;
+            case VK_MENU: key = KEY_RALT; break;
+            case VK_BACK: key = KEY_BACKSPACE; break;
+            case VK_PAUSE: key = KEY_PAUSE; break;
+            case VK_TAB: key = KEY_TAB; break;
+            case VK_F1: key = KEY_F1; break;
+            case VK_F2: key = KEY_F2; break;
+            case VK_F3: key = KEY_F3; break;
+            case VK_F4: key = KEY_F4; break;
+            case VK_F5: key = KEY_F5; break;
+            case VK_F6: key = KEY_F6; break;
+            case VK_F7: key = KEY_F7; break;
+            case VK_F8: key = KEY_F8; break;
+            case VK_F9: key = KEY_F9; break;
+            case VK_F10: key = KEY_F10; break;
+            case VK_F11: key = KEY_F11; break;
+            case VK_F12: key = KEY_F12; break;
             case VK_UP: key = KEY_UPARROW; break;
             case VK_DOWN: key = KEY_DOWNARROW; break;
             case VK_LEFT: key = KEY_LEFTARROW; break;
@@ -187,8 +190,9 @@ void I_StartTic (void)
             case VK_RMENU: key = KEY_RALT; break;
             case VK_LMENU: key = KEY_LALT; break;
             case VK_RETURN: key = KEY_ENTER; break;
-			case VK_PAUSE: key = KEY_PAUSE; break;
 		    case VK_SPACE: key = ' '; break;
+		    case VK_OEM_PLUS: key = KEY_EQUALS; break;
+		    case VK_OEM_MINUS: key = KEY_MINUS; break;
             default:
                 key = tolower( i );
         }
