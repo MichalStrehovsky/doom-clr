@@ -53,6 +53,14 @@ typedef struct app_sound_data_t {
 
 void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_data ) {
     app_sound_data_t* app_sound_data = (app_sound_data_t*) user_data;
+    if( sample_pairs_count == SAMPLECOUNT * 4 ) {
+        I_UpdateSound();
+        for( int i = 0; i < SAMPLECOUNT; ++i ) {
+            for( int j = 0; j < 8; ++j ) {
+                sample_pairs[ i * 8 + j ] = mixbuffer[ i * 2 + ( j % 2 ) ];
+            }
+        }
+    }
     render_music( sample_pairs, sample_pairs_count, app_sound_data->sound_font );
 }
 
@@ -78,7 +86,7 @@ void app_proc( app_t* app, void* user_data )
 
     app_sound_data_t app_sound_data;
     app_sound_data.sound_font = tsf_load_memory( soundfont, sizeof( soundfont ) );
-    app_sound( app, 5880, sound_callback, &app_sound_data );
+    app_sound( app, SAMPLECOUNT * 4 * 2, sound_callback, &app_sound_data );
     while( thread_atomic_int_load(&app_running) && app_yield( app ) != APP_STATE_EXIT_REQUESTED )
     {
         if( app_screen )
@@ -108,7 +116,9 @@ void app_proc( app_t* app, void* user_data )
 
 void app_proc_thread()
 {
+    thread_mutex_init( &mus_mutex );
     app_run( app_proc, NULL, NULL, NULL, NULL );
+    thread_mutex_term( &mus_mutex );
 }
 
 void I_InitGraphics (void)
