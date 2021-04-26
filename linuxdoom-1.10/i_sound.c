@@ -480,6 +480,7 @@ I_StartSound
   // UNUSED
   priority = 0;
   
+  pitch = NORM_PITCH;
 // Returns a handle (not used).
 id = addsfx( id, vol, steptable[pitch], sep );
 
