@@ -148,7 +148,7 @@ void crtemu_pc_coordinates_bitmap_to_window( crtemu_pc_t* crtemu_pc, int width, 
 #else
 
     #include <GL/glew.h>
-    #include <SDL2/SDL_opengl.h>
+    #include "SDL_opengl.h"
     #define CRTEMU_PC_GLCALLTYPE GLAPIENTRY
     
     typedef GLuint CRTEMU_PC_GLuint;
@@ -588,6 +588,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
         "\n"
         "uniform vec3 modulate;\n"
         "uniform vec2 resolution;\n"
+        "uniform vec2 size;\n"
         "uniform float time;\n"
 		"uniform sampler2D backbuffer;\n"
         "uniform sampler2D blurbuffer;\n"
@@ -670,7 +671,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
 	    "    col *= vig;\n"
 	    "\n"
 	    "    /* Scanlines */\n"
-	    "    float scans = clamp( 0.35+0.18*sin(0.0*time+curved_uv.y*resolution.y*1.5), 0.0, 1.0);\n"
+	    "    float scans = clamp( 0.5+0.2*sin(cos(20.0*time)*0.32+curved_uv.y*size.y*1.75f), 0.0, 1.0);\n"
 	    "    float s = pow(scans,0.9);\n"
 	    "    col = col * vec3(s);\n"
         "\n"
@@ -694,15 +695,17 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
 		"        col *= 0.0;\n"
 	    "    if (curved_uv.y < 0.0 || curved_uv.y > 1.0)\n"
 		"        col *= 0.0;\n"
-		"\n"
+		"    col*=modulate; \n"
 	    "    /* Frame */\n"
 	    "    vec2 fscale = vec2( -0.019, -0.018 );\n"
 		"	vec2 fuv=vec2( uv.x, 1.0 - uv.y)*((1.0)+2.0*fscale)-fscale-vec2(-0.0, 0.005);\n"
-	    "    vec4 f=texture2D(frametexture, fuv * vec2(0.91, 0.8) + vec2( 0.050, 0.093 ));\n"
+	    "    vec4 f=texture2D(frametexture, fuv * vec2(0.925, 0.81) + vec2( 0.042, 0.09 ));\n"
 	    "    f.xyz = mix( f.xyz, vec3(0.5,0.5,0.5), 0.5 );\n"
 	    "    float fvig = clamp( -0.00+512.0*uv.x*uv.y*(1.0-uv.x)*(1.0-uv.y), 0.2, 0.85 );\n"
 		"	col *= fvig;\n"
-	    "    col = mix( col, mix( max( col, 0.0), pow( abs( f.xyz ), vec3( 1.4 ) ), f.w), vec3( use_frame) );\n"
+        "    float expon = 1.4;\n"
+        "//    f.xyz = vec3(26.0/255.0,26.0/255.0,26.0/255.0);expon=1.0;\n"
+	    "    col = mix( col, mix( max( col, 0.0), pow( abs( f.xyz ), vec3( expon ) ), f.w), vec3( use_frame) );\n"
         "    \n"
 		"	gl_FragColor = vec4( col, 1.0 );\n"
 		"	}\n"
@@ -1036,7 +1039,7 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
 
 
     // Add slight blur to backbuffer
-    crtemu_pc_internal_blur( crtemu_pc, crtemu_pc->accumulatetexture_a, crtemu_pc->accumulatebuffer_a, crtemu_pc->blurbuffer_b, crtemu_pc->blurtexture_b, 0.17f, width, height );
+    crtemu_pc_internal_blur( crtemu_pc, crtemu_pc->accumulatetexture_a, crtemu_pc->accumulatebuffer_a, crtemu_pc->blurbuffer_b, crtemu_pc->blurtexture_b, /*0.17f*/ 0.0f, width, height );
 
     // Create fully blurred version of backbuffer
     crtemu_pc_internal_blur( crtemu_pc, crtemu_pc->accumulatetexture_a, crtemu_pc->blurbuffer_a, crtemu_pc->blurbuffer_b, crtemu_pc->blurtexture_b, 1.0f, width, height );
@@ -1050,18 +1053,29 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
     int window_width = viewport[ 2 ] - viewport[ 0 ];
     int window_height = viewport[ 3 ] - viewport[ 1 ];
 
-    window_width = (int)( window_width / 1.2f );
+    int aspect_width = (int)( ( window_height * 4.25f ) / 3 );
+    int aspect_height= (int)( ( window_width * 3 ) / 4.25f );
+    int target_width, target_height;
+    if( aspect_height <= window_height ) 
+        {
+        target_width = window_width;
+        target_height = aspect_height;
+        } 
+    else
+        {
+        target_width = aspect_width;
+        target_height = window_height;
+        }
 
-    float hscale = window_width / (float) width;
-    float vscale = window_height / ( (float) height * 1.35f );
-    float pixel_scale = hscale < vscale ? hscale : vscale;
+    float hscale = target_width / (float) width;
+    float vscale = target_height / (float) height;
 
-    float hborder = ( window_width - pixel_scale * width ) / 2.0f;
-    float vborder = ( window_height - pixel_scale * height * 1.35f ) / 2.0f;
+    float hborder = ( window_width - hscale * width ) / 2.0f;
+    float vborder = ( window_height - vscale * height ) / 2.0f;
     float x1 = hborder;
     float y1 = vborder;
-    float x2 = x1 + pixel_scale * width;
-    float y2 = y1 + pixel_scale * height * 1.35f;
+    float x2 = x1 + hscale * width;
+    float y2 = y1 + vscale * height;
 
     x1 = ( x1 / window_width ) * 2.0f - 1.0f;
     x2 = ( x2 / window_width ) * 2.0f - 1.0f;
@@ -1101,6 +1115,7 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
     crtemu_pc->Uniform1f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "use_frame" ), crtemu_pc->use_frame );
     crtemu_pc->Uniform1f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "time" ), 1.5f * (CRTEMU_PC_GLfloat)( ( (double) time_us ) / 1000000.0 ) );
     crtemu_pc->Uniform2f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "resolution" ), (float) window_width, (float) window_height );
+    crtemu_pc->Uniform2f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "size" ), (float) target_width, (float) target_height );
 
     float mod_r = ( ( mod_xbgr >> 16 ) & 0xff ) / 255.0f;
     float mod_g = ( ( mod_xbgr >> 8  ) & 0xff ) / 255.0f;
@@ -1170,15 +1185,28 @@ void crtemu_pc_coordinates_window_to_bitmap( crtemu_pc_t* crtemu_pc, int width, 
     int window_width = viewport[ 2 ] - viewport[ 0 ];
     int window_height = viewport[ 3 ] - viewport[ 1 ];
 
-    float hscale = window_width / (float) width;
-    float vscale = window_height / (float) height;
-    float pixel_scale = hscale < vscale ? hscale : vscale;
+    int aspect_width = (int)( ( window_height * 4.25f ) / 3 );
+    int aspect_height= (int)( ( window_width * 3 ) / 4.25f );
+    int target_width, target_height;
+    if( aspect_height <= window_height ) 
+        {
+        target_width = window_width;
+        target_height = aspect_height;
+        } 
+    else
+        {
+        target_width = aspect_width;
+        target_height = window_height;
+        }
 
-    float hborder = ( window_width - pixel_scale * width ) / 2.0f;
-    float vborder = ( window_height - pixel_scale * height ) / 2.0f;
+    float hscale = target_width / (float) width;
+    float vscale = target_height / (float) height;
+
+    float hborder = ( window_width - hscale * width ) / 2.0f;
+    float vborder = ( window_height - vscale * height ) / 2.0f;
     
-    float xp = ( ( *x - hborder ) / pixel_scale ) / (float) width;
-    float yp = ( ( *y - vborder ) / pixel_scale ) / (float) height;
+    float xp = ( ( *x - hborder ) / hscale ) / (float) width;
+    float yp = ( ( *y - vborder ) / vscale ) / (float) height;
 
     /* TODO: Common params for shader and this */
     float xc = ( xp - 0.5f ) * 2.0f;
@@ -1195,14 +1223,17 @@ void crtemu_pc_coordinates_window_to_bitmap( crtemu_pc_t* crtemu_pc, int width, 
     yc = ( yc / 2.0f ) + 0.5f;
     xc = xc * 0.92f + 0.04f;
     yc = yc * 0.92f + 0.04f;
-    xp = xc * 0.6f + xp * 0.4f; 
-    yp = yc * 0.6f + yp * 0.4f; 
+    xp = xc * 0.2f + xp * 0.8f; 
+    yp = yc * 0.2f + yp * 0.8f; 
 
     xp = xp * ( 1.0f - 0.04f ) + 0.04f / 2.0f + 0.003f;
     yp = yp * ( 1.0f - 0.04f ) + 0.04f / 2.0f - 0.001f;
 
-    xp = xp * 1.025f - 0.0125f;
-    yp = yp * 0.92f + 0.04f;
+    xp = xp * 1.035f -0.0125f*0.75f;
+    yp = yp * 0.96f + 0.02f;
+
+    xp = xp * 1.2f - 0.1f;
+    yp = yp * 1.2f - 0.1f;
 
     xp *= width;
     yp *= height;

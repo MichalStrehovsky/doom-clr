@@ -39,6 +39,31 @@ void sound_callback( APP_S16* sample_pairs, int sample_pairs_count, void* user_d
 }
 
 
+static void load_crt_frame_col( void* data, struct GIF_WHDR* whdr ) {
+    APP_U32* pixels = (APP_U32*) data;
+    for( int i = 0; i < 1024 * 1024; ++i ) {
+        uint8_t v = whdr->bptr[ i ];
+        pixels[ i ] = ( whdr->cpal[ v ].B << 16 ) |( whdr->cpal[ v ].G << 8 ) | ( whdr->cpal[ v ].R );
+    }
+}
+
+static void load_crt_frame_alpha( void* data, struct GIF_WHDR* whdr ) {
+    APP_U32* pixels = (APP_U32*) data;
+    for( int i = 0; i < 1024 * 1024; ++i ) {
+        uint8_t v = whdr->bptr[ i ];
+        pixels[ i ] = pixels[ i ] | ( whdr->cpal[ v ].R << 24);
+    }
+}
+
+static APP_U32* load_crt_frame( void ) {
+    APP_U32* pixels = (APP_U32*) malloc( 1024 * 1024 * sizeof( APP_U32 ) );
+    memset( pixels, 0, 1024 * 1024 * sizeof( APP_U32 ) );
+    GIF_Load( crtframecol, (long)sizeof( crtframecol ), load_crt_frame_col, NULL, (void*)pixels, 0L );
+    GIF_Load( crtframealpha, (long)sizeof( crtframealpha), load_crt_frame_alpha, NULL, (void*)pixels, 0L );
+    return pixels;
+}
+
+
 int counter = 0;
 void app_proc( app_t* app, void* user_data )
 {
@@ -53,7 +78,9 @@ void app_proc( app_t* app, void* user_data )
     frametimer_lock_rate( frametimer, 60 );
     
     crtemu_pc_t* crtemu_pc = crtemu_pc_create( 0 );
-	crtemu_pc_frame( crtemu_pc, (CRTEMU_PC_U32*) a_crt_frame, 1024, 1024 );
+    APP_U32* frame = load_crt_frame();
+    crtemu_pc_frame( crtemu_pc, frame, 1024, 1024 );
+    free( frame );
 
     APP_U32 empty = 0;
     app_pointer( app, 1, 1, empty, 0, 0 );

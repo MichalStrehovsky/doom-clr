@@ -107,8 +107,9 @@ static_assert( sizeof( void* ) == 4, "Must be built as a 32 bit application. Use
 #include "libs_win32/frametimer.h"
 
 #define CRTEMU_PC_IMPLEMENTATION
+#include "libs_win32/gif_load.h"
 #include "libs_win32/crtemu_pc.h"
-#include "libs_win32/crt_frame_pc.h"
+#include "libs_win32/crtframe.h"
 
 #define THREAD_IMPLEMENTATION
 #include "libs_win32/thread.h"
