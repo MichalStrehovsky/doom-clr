@@ -127,6 +127,7 @@ void crtemu_pc_coordinates_bitmap_to_window( crtemu_pc_t* crtemu_pc, int width, 
     #define CRTEMU_PC_GL_TEXTURE1 0x84c1
     #define CRTEMU_PC_GL_TEXTURE2 0x84c2
     #define CRTEMU_PC_GL_TEXTURE3 0x84c3
+    #define CRTEMU_PC_GL_TEXTURE4 0x84c4
     #define CRTEMU_PC_GL_TEXTURE_MIN_FILTER 0x2801
     #define CRTEMU_PC_GL_TEXTURE_MAG_FILTER 0x2800
     #define CRTEMU_PC_GL_NEAREST 0x2600
@@ -144,6 +145,7 @@ void crtemu_pc_coordinates_bitmap_to_window( crtemu_pc_t* crtemu_pc, int width, 
     #define CRTEMU_PC_GL_TEXTURE_WRAP_T 0x2803
     #define CRTEMU_PC_GL_CLAMP_TO_BORDER 0x812D
     #define CRTEMU_PC_GL_TEXTURE_BORDER_COLOR 0x1004
+    #define CRTEMU_PC_GL_CLAMP_TO_EDGE 0x812F
 
 #else
 
@@ -214,6 +216,8 @@ struct crtemu_pc_t
 
     CRTEMU_PC_GLuint frametexture; 
     float use_frame;
+    
+    CRTEMU_PC_GLuint gradienttexture; 
 
     CRTEMU_PC_GLuint crt_shader;   
     CRTEMU_PC_GLuint blur_shader;  
@@ -594,6 +598,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
         "uniform sampler2D blurbuffer;\n"
         "uniform sampler2D frametexture;\n"
         "uniform float use_frame;\n"
+        "uniform sampler2D gradienttexture;\n"
         "\n"
         "vec3 tsample( sampler2D samp, vec2 tc, float offs, vec2 resolution )\n"
 	    "    {\n"
@@ -671,7 +676,7 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
 	    "    col *= vig;\n"
 	    "\n"
 	    "    /* Scanlines */\n"
-	    "    float scans = clamp( 0.5+0.2*sin(cos(20.0*time)*0.32+curved_uv.y*size.y*1.75f), 0.0, 1.0);\n"
+	    "    float scans = clamp( 0.4+0.3*sin(cos(20.0*time)*0.32+curved_uv.y*size.y*1.75f), 0.0, 1.0);\n"
 	    "    float s = pow(scans,0.9);\n"
 	    "    col = col * vec3(s);\n"
         "\n"
@@ -695,6 +700,11 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
 		"        col *= 0.0;\n"
 	    "    if (curved_uv.y < 0.0 || curved_uv.y > 1.0)\n"
 		"        col *= 0.0;\n"
+        "    vec3 extrablur = tsample(blurbuffer,scuv,resolution.y/800.0, resolution ).xyz;\n"
+        "    col = col * 0.9 + ( pow( clamp( extrablur, 0.0, 1.0 ), vec3( 0.2 ) ) ) *0.3;\n"
+        "    float lum = 0.299*col.x + 0.587*col.y + 0.114*col.z;\n"
+        "    lum = pow( lum,  1.1 );\n"
+        "    col = texture2D(gradienttexture, vec2( lum, 0.0 ) ).xyz;\n"
 		"    col*=modulate; \n"
 	    "    /* Frame */\n"
 	    "    vec2 fscale = vec2( -0.019, -0.018 );\n"
@@ -821,6 +831,13 @@ crtemu_pc_t* crtemu_pc_create( void* memctx )
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MIN_FILTER, CRTEMU_PC_GL_LINEAR );
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MAG_FILTER, CRTEMU_PC_GL_LINEAR );
 
+    crtemu_pc->GenTextures( 1, &crtemu_pc->gradienttexture ); 
+    crtemu_pc->Enable( CRTEMU_PC_GL_TEXTURE_2D ); 
+    crtemu_pc->ActiveTexture( CRTEMU_PC_GL_TEXTURE2 );
+    crtemu_pc->BindTexture( CRTEMU_PC_GL_TEXTURE_2D, crtemu_pc->gradienttexture );
+    crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MIN_FILTER, CRTEMU_PC_GL_LINEAR );
+    crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MAG_FILTER, CRTEMU_PC_GL_LINEAR );
+
     crtemu_pc->GenTextures( 1, &crtemu_pc->backbuffer ); 
     crtemu_pc->Enable( CRTEMU_PC_GL_TEXTURE_2D ); 
     crtemu_pc->ActiveTexture( CRTEMU_PC_GL_TEXTURE0 );
@@ -845,6 +862,7 @@ failed:
     if( crtemu_pc->blurtexture_b ) crtemu_pc->DeleteTextures( 1, &crtemu_pc->blurtexture_b );
     if( crtemu_pc->blurbuffer_b ) crtemu_pc->DeleteFramebuffers( 1, &crtemu_pc->blurbuffer_b );
     if( crtemu_pc->frametexture ) crtemu_pc->DeleteTextures( 1, &crtemu_pc->frametexture ); 
+    if( crtemu_pc->gradienttexture ) crtemu_pc->DeleteTextures( 1, &crtemu_pc->gradienttexture ); 
     if( crtemu_pc->backbuffer ) crtemu_pc->DeleteTextures( 1, &crtemu_pc->backbuffer ); 
     if( crtemu_pc->vertexbuffer ) crtemu_pc->DeleteBuffers( 1, &crtemu_pc->vertexbuffer );
 
@@ -867,6 +885,7 @@ void crtemu_pc_destroy( crtemu_pc_t* crtemu_pc )
     crtemu_pc->DeleteTextures( 1, &crtemu_pc->blurtexture_b );
     crtemu_pc->DeleteFramebuffers( 1, &crtemu_pc->blurbuffer_b );
     crtemu_pc->DeleteTextures( 1, &crtemu_pc->frametexture ); 
+    crtemu_pc->DeleteTextures( 1, &crtemu_pc->gradienttexture ); 
     crtemu_pc->DeleteTextures( 1, &crtemu_pc->backbuffer ); 
     crtemu_pc->DeleteBuffers( 1, &crtemu_pc->vertexbuffer );
     #ifndef CRTEMU_PC_SDL
@@ -891,6 +910,13 @@ void crtemu_pc_frame( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U32* frame_abgr, int fra
         crtemu_pc->use_frame = 1.0f;
     else
         crtemu_pc->use_frame = 0.0f;
+    }
+
+void crtemu_pc_gradient( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U32 gradient_abgr[ 256 ] )
+    {
+    crtemu_pc->ActiveTexture( CRTEMU_PC_GL_TEXTURE3 );
+    crtemu_pc->BindTexture( CRTEMU_PC_GL_TEXTURE_2D, crtemu_pc->gradienttexture );   
+    crtemu_pc->TexImage2D( CRTEMU_PC_GL_TEXTURE_2D, 0, CRTEMU_PC_GL_RGBA, 256, 1, 0, CRTEMU_PC_GL_RGBA, CRTEMU_PC_GL_UNSIGNED_BYTE, gradient_abgr ); 
     }
 
 
@@ -1039,7 +1065,7 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
 
 
     // Add slight blur to backbuffer
-    crtemu_pc_internal_blur( crtemu_pc, crtemu_pc->accumulatetexture_a, crtemu_pc->accumulatebuffer_a, crtemu_pc->blurbuffer_b, crtemu_pc->blurtexture_b, /*0.17f*/ 0.0f, width, height );
+    crtemu_pc_internal_blur( crtemu_pc, crtemu_pc->accumulatetexture_a, crtemu_pc->accumulatebuffer_a, crtemu_pc->blurbuffer_b, crtemu_pc->blurtexture_b, /*0.17f*/ 0.1f, width, height );
 
     // Create fully blurred version of backbuffer
     crtemu_pc_internal_blur( crtemu_pc, crtemu_pc->accumulatetexture_a, crtemu_pc->blurbuffer_a, crtemu_pc->blurbuffer_b, crtemu_pc->blurtexture_b, 1.0f, width, height );
@@ -1112,6 +1138,7 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
     crtemu_pc->Uniform1i( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "backbuffer" ), 0 );
     crtemu_pc->Uniform1i( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "blurbuffer" ), 1 );
     crtemu_pc->Uniform1i( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "frametexture" ), 2 );
+    crtemu_pc->Uniform1i( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "gradienttexture" ), 3 );
     crtemu_pc->Uniform1f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "use_frame" ), crtemu_pc->use_frame );
     crtemu_pc->Uniform1f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "time" ), 1.5f * (CRTEMU_PC_GLfloat)( ( (double) time_us ) / 1000000.0 ) );
     crtemu_pc->Uniform2f( crtemu_pc->GetUniformLocation( crtemu_pc->crt_shader, "resolution" ), (float) window_width, (float) window_height );
@@ -1159,13 +1186,20 @@ void crtemu_pc_present( crtemu_pc_t* crtemu_pc, CRTEMU_PC_U64 time_us, CRTEMU_PC
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_WRAP_T, CRTEMU_PC_GL_CLAMP_TO_BORDER );
     crtemu_pc->TexParameterfv( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_BORDER_COLOR, color );    
 
-    crtemu_pc->ActiveTexture( CRTEMU_PC_GL_TEXTURE3 );
+    crtemu_pc->ActiveTexture( CRTEMU_PC_GL_TEXTURE2 );
     crtemu_pc->BindTexture( CRTEMU_PC_GL_TEXTURE_2D, crtemu_pc->frametexture );   
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MIN_FILTER, CRTEMU_PC_GL_LINEAR );
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MAG_FILTER, CRTEMU_PC_GL_LINEAR );
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_WRAP_S, CRTEMU_PC_GL_CLAMP_TO_BORDER );
     crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_WRAP_T, CRTEMU_PC_GL_CLAMP_TO_BORDER );
     crtemu_pc->TexParameterfv( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_BORDER_COLOR, color );    
+
+    crtemu_pc->ActiveTexture( CRTEMU_PC_GL_TEXTURE3 );
+    crtemu_pc->BindTexture( CRTEMU_PC_GL_TEXTURE_2D, crtemu_pc->gradienttexture );   
+    crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MIN_FILTER, CRTEMU_PC_GL_LINEAR );
+    crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_MAG_FILTER, CRTEMU_PC_GL_LINEAR );
+    crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_WRAP_S, CRTEMU_PC_GL_CLAMP_TO_EDGE );
+    crtemu_pc->TexParameteri( CRTEMU_PC_GL_TEXTURE_2D, CRTEMU_PC_GL_TEXTURE_WRAP_T, CRTEMU_PC_GL_CLAMP_TO_EDGE );
 
     crtemu_pc->DrawArrays( CRTEMU_PC_GL_TRIANGLE_FAN, 0, 4 );    
 
