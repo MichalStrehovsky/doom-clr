@@ -1,3 +1,49 @@
+DOOM-CLR
+========
+
+This is DOOM runnable as a .NET application.
+
+I took DOOM-CRT by Mattias Gustavsson as a baseline because I really
+like the way it builds (run `cl doom.c` and off you go). Readme for
+DOOM-CRT follows this one.
+
+DOOM-CLR has a couple patches so that it can be built with the `/clr` switch.
+
+Common type system doesn't have a representation for "method with an
+unknown signature" so the C construct where you can declare a method
+with no parameters and then define it with a parameter list doesn't work.
+Pretty much all the changes are around that.
+
+I would like to get it to build as `/clr:pure` at some point. It doesn't
+look too far off. The only annoying bit is that things like
+
+```c
+static const char rcsid[] = "$Id: am_map.c,v 1.4 1997/02/03 21:24:33 b1 Exp $";
+```
+
+don't compile with `/clr:pure`. The compiler has trouble generating the
+static initialization support. I suspect it has to do with AppDomains.
+I wish there was a way to tell the compiler to not worry about AppDomains.
+
+Without `/clr:pure`, the compiler emits native code for some of the methods.
+Most of DOOM is pure IL though. You can see in ILDASM. ILSpy can even decompile
+some of it to C#.
+
+To compile a CLR-hosted DOOM, run:
+
+```bash
+$ cl /clr /BC doom.c
+```
+
+`/BC` is an [undocumented switch](http://blog.airesoft.co.uk/2013/01/plug-in-to-cls-kitchen/)
+that enables what I would call "C/CLI" or "Managed C" support
+in the VC++ compiler. `cl` would reject compiling C with `/clr` without that.
+
+------------------------------------------------------------------------
+## ORIGINAL README FROM DOOM-CRT
+------------------------------------------------------------------------
+
+
 DOOM-CRT
 ========
 

@@ -1,3 +1,5 @@
+#include <io.h>
+
 static_assert( sizeof( void* ) == 4, "Must be built as a 32 bit application. Use the x86 visual studio command prompt." );
 
 #pragma warning( disable: 4113 )
