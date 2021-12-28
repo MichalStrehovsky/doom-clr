@@ -6,9 +6,6 @@
  * https://stackoverflow.com/a/826027/1202830
  */
 
-#include <stdlib.h>
-#include <process.h> /* for getpid() and the exec..() family */
-#include <direct.h> /* for _getcwd() and _chdir() */
 
 #define srandom srand
 #define random rand

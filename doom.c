@@ -1,4 +1,9 @@
 #include <io.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <process.h> /* for getpid() and the exec..() family */
+#include <direct.h> /* for _getcwd() and _chdir() */
 
 static_assert( sizeof( void* ) == 4, "Must be built as a 32 bit application. Use the x86 visual studio command prompt." );
 
